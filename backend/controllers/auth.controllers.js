@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
+import generateTokenAndSetCookie from "../utils/generateToken.js";
 
 export const signup = async(req, res) => {
    try {
@@ -31,14 +32,20 @@ export const signup = async(req, res) => {
            profilePicture: gender === "male" ? boyProfilePic : girlProfilePic
        });
 
-       await newUser.save();
+    if(newUser) {
+        //generate JWT token here
+        generateTokenAndSetCookie(newUser._id, res);
+        await newUser.save();
 
-       res.status(200).json({
-        _id: newUser._id,
-        fullName: newUser.fullName,
-        username: newUser.username,
-        profilePicture: newUser.profilePicture
-       });
+        res.status(200).json({
+         _id: newUser._id,
+         fullName: newUser.fullName,
+         username: newUser.username,
+         profilePicture: newUser.profilePicture
+        });
+    } else {
+        res.status(400).json({message: "Invalid User data"})
+    }
 
    } catch (error) {
        console.log("Error in signup controller", error.message);
@@ -51,5 +58,26 @@ export const logout = async(req, res) => {
 }
 
 export const login = async(req, res) => {
-    console.log("loginUser");
+   try {
+    const {username, password} = req.body;
+    const user = await User.findOne({username});
+    const isPasswordCorrect = await bcrypt.compare(password, user?.password || "");
+
+    if(!user || !isPasswordCorrect) {
+        return res.status(400).json({message: "Invalid username or password"})
+    }
+
+    generateTokenAndSetCookie(user._id, res);
+    res.status(200).json({
+        _id: user._id,
+        fullName: user.fullName,
+        username: user.username,
+        profilePicture: user.profilePicture
+    });
+
+   } catch {
+         console.log("Error in login controller", error.message);
+         res.status(500).json({message: "Internal server error"})
+   }
+
 }
